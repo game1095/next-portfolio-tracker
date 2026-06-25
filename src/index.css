@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas-dark: #0b0e11;
+  --color-surface-card: #1e2329;
+  --color-surface-elevated: #2b3139;
+  
+  --color-primary: #FCD535;
+  --color-primary-active: #f0b90b;
+  --color-primary-disabled: #3a3a1f;
+  
+  --color-trading-up: #0ecb81;
+  --color-trading-down: #f6465d;
+  
+  --color-text-body: #eaecef;
+  --color-text-muted: #707a8a;
+  --color-text-on-primary: #181a20;
+
+  --font-sans: "Inter", sans-serif;
+  --font-tabular: "JetBrains Mono", monospace;
+}
+
+body {
+  background-color: var(--color-canvas-dark);
+  color: var(--color-text-body);
+  font-family: var(--font-sans);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-elevated);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-elevated) transparent;
+}
+
+/* Progress Bar Animation */
+@keyframes progress-stripes {
+  0% { background-position: 1rem 0; }
+  100% { background-position: 0 0; }
+}
+
+.animate-progress {
+  background-image: linear-gradient(
+    45deg, 
+    rgba(255,255,255,0.15) 25%, 
+    transparent 25%, 
+    transparent 50%, 
+    rgba(255,255,255,0.15) 50%, 
+    rgba(255,255,255,0.15) 75%, 
+    transparent 75%, 
+    transparent
+  );
+  background-size: 1rem 1rem;
+  animation: progress-stripes 1s linear infinite;
+}
+
+/* Running Man Animation */
+@keyframes run {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-10%) rotate(5deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-10%) rotate(-5deg); }
+}
+
+.animate-run {
+  animation: run 0.3s infinite;
+  display: inline-block;
+}
