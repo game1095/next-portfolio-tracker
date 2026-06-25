@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { LayoutDashboard, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import InfoTooltip from './InfoTooltip';
 
@@ -84,22 +84,24 @@ export default function HoldingsTable({ data, loading, currency }) {
     return () => clearInterval(timer);
   }, [lastUpdate]);
 
-  if (!data?.holdings) return null;
 
-  const sortedHoldings = [...data.holdings].sort((a, b) => {
-    let aVal = a[sortConfig.key];
-    let bVal = b[sortConfig.key];
-    
-    // Handle nested sort keys if needed
-    if (sortConfig.key === 'unrealizedPlPercent') {
-      aVal = a.unrealizedPlPercent;
-      bVal = b.unrealizedPlPercent;
-    }
-    
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
+  const sortedHoldings = useMemo(() => {
+    if (!data?.holdings) return [];
+    return [...data.holdings].sort((a, b) => {
+      let aVal = a[sortConfig.key];
+      let bVal = b[sortConfig.key];
+      
+      // Handle nested sort keys if needed
+      if (sortConfig.key === 'unrealizedPlPercent') {
+        aVal = a.unrealizedPlPercent;
+        bVal = b.unrealizedPlPercent;
+      }
+      
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data?.holdings, sortConfig]);
 
   const requestSort = (key) => {
     let direction = 'desc';
@@ -124,10 +126,14 @@ export default function HoldingsTable({ data, loading, currency }) {
   const currencySymbol = currency === 'USD' ? '$' : '฿';
 
   const totalPages = Math.ceil((sortedHoldings?.length || 0) / ITEMS_PER_PAGE);
-  const currentHoldings = sortedHoldings.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const currentHoldings = useMemo(() => {
+    return sortedHoldings.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+    );
+  }, [sortedHoldings, currentPage]);
+
+  if (!data?.holdings) return null;
 
   return (
     <section className="bg-surface-card rounded-xl border border-surface-elevated">

@@ -1,75 +1,32 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Newspaper, Filter } from 'lucide-react';
 import NewsCard from './NewsCard';
 import InfoTooltip from '../InfoTooltip';
 
-export default function NewsDashboard({ holdings }) {
-  const [news, setNews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filterSymbol, setFilterSymbol] = useState('ALL');
+export default function NewsDashboard({ holdings, newsData }) {
+  const [filterSymbol, setFilterSymbol] = useState(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchNews = async () => {
-      if (!holdings || holdings.length === 0) {
-        setLoading(false);
-        return;
+    if (filterSymbol === null && holdings && holdings.length > 0) {
+      const active = holdings.filter(h => h.totalShares > 0);
+      if (active.length > 0) {
+        const top = [...active].sort((a, b) => b.totalValue - a.totalValue)[0];
+        setFilterSymbol(top.symbol);
+      } else {
+        setFilterSymbol('ALL');
       }
-
-      setLoading(true);
-      setError(null);
-
-      const symbols = [...new Set(holdings.filter(h => h.totalShares > 0).map(h => h.symbol))];
-
-      if (symbols.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await axios.post('/api/market/news', { symbols });
-        if (isMounted) {
-          setNews(response.data.news || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch news:', err);
-        if (isMounted) {
-          setError('Failed to load portfolio news. Please try again later.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchNews();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [holdings]);
+    }
+  }, [holdings, filterSymbol]);
 
   const activeHoldings = holdings?.filter(h => h.totalShares > 0) || [];
   const uniqueSymbols = [...new Set(activeHoldings.map(h => h.symbol))];
 
-  if (loading) {
+  if (!newsData) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="bg-surface-card border border-surface-elevated rounded-xl p-4 h-32"></div>
         ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-8 text-center bg-surface-card border border-surface-elevated rounded-xl">
-        <p className="text-trading-down text-sm">{error}</p>
       </div>
     );
   }
@@ -84,9 +41,10 @@ export default function NewsDashboard({ holdings }) {
     );
   }
 
-  const filteredNews = filterSymbol === 'ALL' 
-    ? news 
-    : news.filter(article => article.relatedSymbol === filterSymbol);
+  const currentFilter = filterSymbol || 'ALL';
+  const filteredNews = currentFilter === 'ALL' 
+    ? newsData 
+    : newsData.filter(article => article.relatedSymbol === currentFilter);
 
   return (
     <section className="bg-surface-card rounded-xl border border-surface-elevated">
@@ -110,7 +68,7 @@ export default function NewsDashboard({ holdings }) {
           <Filter size={14} className="text-text-muted shrink-0 mr-1" />
           <button 
             onClick={() => setFilterSymbol('ALL')}
-            className={`shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${filterSymbol === 'ALL' ? 'bg-primary text-text-on-primary' : 'bg-canvas-dark border border-surface-elevated text-text-muted hover:text-text-body'}`}
+            className={`shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${currentFilter === 'ALL' ? 'bg-primary text-text-on-primary' : 'bg-canvas-dark border border-surface-elevated text-text-muted hover:text-text-body'}`}
           >
             All News
           </button>
@@ -118,7 +76,7 @@ export default function NewsDashboard({ holdings }) {
             <button 
               key={sym}
               onClick={() => setFilterSymbol(sym)}
-              className={`shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${filterSymbol === sym ? 'bg-primary text-text-on-primary' : 'bg-canvas-dark border border-surface-elevated text-text-muted hover:text-text-body'}`}
+              className={`shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${currentFilter === sym ? 'bg-primary text-text-on-primary' : 'bg-canvas-dark border border-surface-elevated text-text-muted hover:text-text-body'}`}
             >
               {sym}
             </button>
@@ -129,7 +87,7 @@ export default function NewsDashboard({ holdings }) {
       {/* News Grid */}
       {filteredNews.length === 0 ? (
         <div className="p-8 text-center bg-surface-card border border-surface-elevated rounded-xl">
-          <p className="text-text-muted text-sm">No recent news found for {filterSymbol === 'ALL' ? 'your portfolio assets' : filterSymbol}.</p>
+          <p className="text-text-muted text-sm">No recent news found for {currentFilter === 'ALL' ? 'your portfolio assets' : currentFilter}.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -139,7 +97,7 @@ export default function NewsDashboard({ holdings }) {
         </div>
       )}
       
-        {news.length > 0 && (
+        {newsData && newsData.length > 0 && (
           <div className="text-center pt-2">
             <p className="text-[10px] text-text-muted">News aggregated from Yahoo Finance</p>
           </div>

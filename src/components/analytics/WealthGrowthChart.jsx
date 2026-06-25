@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import { AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { LineChart as LineChartIcon } from 'lucide-react';
 import InfoTooltip from '../InfoTooltip';
 
-export default function WealthGrowthChart({ deepData }) {
+export default memo(function WealthGrowthChart({ deepData }) {
   if (!deepData?.historicalTimeline) return null;
 
   const combinedData = [...deepData.historicalTimeline, ...(deepData.forecast || [])];
@@ -67,4 +68,4 @@ export default function WealthGrowthChart({ deepData }) {
       </div>
     </div>
   );
-}
+});

@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [serverStatus, setServerStatus] = useState('Connecting...')
   const [data, setData] = useState(null)
   const [deepData, setDeepData] = useState(null)
+  const [newsData, setNewsData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [transactionToEdit, setTransactionToEdit] = useState(null)
@@ -60,13 +61,25 @@ export default function Dashboard() {
       const testRes = await axios.get('/api/test')
       setServerStatus(testRes.data.message)
 
-      // Fetch transactions data and deep analytics concurrently
-      const txPromise = axios.get(`/api/transactions?portfolioId=${activePortfolioId}`)
-      const deepPromise = axios.get(`/api/analytics/deep?portfolioId=${activePortfolioId}`).catch(e => { console.error('Deep analytics failed', e); return { data: null }; });
-      
-      const [txRes, deepRes] = await Promise.all([txPromise, deepPromise])
+      // Fetch core dashboard data first to make loading significantly faster
+      const txRes = await axios.get(`/api/transactions?portfolioId=${activePortfolioId}`)
       setData(txRes.data)
-      setDeepData(deepRes.data)
+      
+      // Fetch heavy data in the background so it doesn't block the UI
+      if (!isBackground) {
+        axios.get(`/api/analytics/deep?portfolioId=${activePortfolioId}`)
+          .then(res => setDeepData(res.data))
+          .catch(e => { console.error('Deep analytics failed', e); setDeepData(null); });
+          
+        const activeSymbols = [...new Set((txRes.data.holdings || []).filter(h => h.totalShares > 0).map(h => h.symbol))];
+        if (activeSymbols.length > 0) {
+          axios.post('/api/market/news', { symbols: activeSymbols })
+            .then(res => setNewsData(res.data.news || []))
+            .catch(e => { console.error('News failed', e); setNewsData([]); });
+        } else {
+          setNewsData([]);
+        }
+      }
     } catch (err) {
       console.error(err)
       setServerStatus('Failed to connect to backend.')
@@ -221,7 +234,7 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'news' && (
-          <NewsDashboard holdings={data?.holdings} />
+          <NewsDashboard holdings={data?.holdings} newsData={newsData} />
         )}
       </main>
 

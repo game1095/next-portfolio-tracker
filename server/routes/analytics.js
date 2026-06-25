@@ -1,6 +1,7 @@
 import express from 'express';
 import Transaction from '../models/Transaction.js';
 import YahooFinance from 'yahoo-finance2';
+import cache from '../utils/cache.js';
 
 const router = express.Router();
 const yahooFinance = new YahooFinance();
@@ -48,9 +49,19 @@ router.get('/deep', async (req, res) => {
     const historicalData = {};
     const priceCache = {}; // Cache daily prices: priceCache[symbol]['YYYY-MM-DD'] = price
 
+    const startStr = startDate.toISOString().split('T')[0];
+    const todayStr = today.toISOString().split('T')[0];
+
     await Promise.all(symbols.map(async (sym) => {
       try {
-        const hist = await yahooFinance.historical(sym, { period1: startDate, period2: today, interval: '1d' });
+        const cacheKey = `hist_${sym}_${startStr}_${todayStr}`;
+        let hist = cache.get(cacheKey);
+        
+        if (!hist) {
+          hist = await yahooFinance.historical(sym, { period1: startDate, period2: today, interval: '1d' });
+          cache.set(cacheKey, hist, 3600); // Cache historical data for 1 hour
+        }
+        
         priceCache[sym] = {};
         hist.forEach(h => {
           const dateStr = h.date.toISOString().split('T')[0];

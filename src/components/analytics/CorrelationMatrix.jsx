@@ -1,7 +1,8 @@
+import { memo } from 'react';
 import { Grid3X3 } from 'lucide-react';
 import InfoTooltip from '../InfoTooltip';
 
-export default function CorrelationMatrix({ matrix, topSymbols }) {
+export default memo(function CorrelationMatrix({ matrix, topSymbols }) {
   if (!matrix || !topSymbols || topSymbols.length === 0) return null;
 
   return (
@@ -54,4 +55,4 @@ export default function CorrelationMatrix({ matrix, topSymbols }) {
       </div>
     </div>
   );
-}
+});

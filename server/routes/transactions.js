@@ -1,6 +1,7 @@
 import express from 'express';
 import Transaction from '../models/Transaction.js';
 import YahooFinance from 'yahoo-finance2';
+import cache from '../utils/cache.js';
 const yahooFinance = new YahooFinance();
 
 const router = express.Router();
@@ -122,8 +123,15 @@ router.get('/', async (req, res) => {
     
     try {
       if (apiSymbols.length > 0) {
-        const quotes = await yahooFinance.quote(apiSymbols);
-        const quotesArray = Array.isArray(quotes) ? quotes : [quotes];
+        const cacheKey = `quotes_${apiSymbols.sort().join('_')}`;
+        let quotesArray = cache.get(cacheKey);
+        
+        if (!quotesArray) {
+          const quotes = await yahooFinance.quote(apiSymbols);
+          quotesArray = Array.isArray(quotes) ? quotes : [quotes];
+          cache.set(cacheKey, quotesArray, 60); // Cache prices for 60 seconds
+        }
+        
         quotesArray.forEach(q => {
           marketData[q.symbol] = {
             currentPrice: q.regularMarketPrice,
@@ -140,15 +148,22 @@ router.get('/', async (req, res) => {
 
         // Fetch quoteSummary for sectors
         for (const sym of symbols) {
-          try {
-            const qs = await yahooFinance.quoteSummary(sym, { modules: ['assetProfile'] });
-            quoteSummaries[sym] = {
-              sector: qs.assetProfile?.sector || 'Unknown',
-              website: qs.assetProfile?.website || null
-            };
-          } catch (e) {
-            quoteSummaries[sym] = { sector: 'Unknown' };
+          const summaryKey = `summary_${sym}`;
+          let qs = cache.get(summaryKey);
+          
+          if (!qs) {
+            try {
+              qs = await yahooFinance.quoteSummary(sym, { modules: ['assetProfile'] });
+              cache.set(summaryKey, qs, 3600); // Cache sector data for 1 hour
+            } catch (e) {
+              qs = { assetProfile: { sector: 'Unknown' } };
+            }
           }
+          
+          quoteSummaries[sym] = {
+            sector: qs.assetProfile?.sector || 'Unknown',
+            website: qs.assetProfile?.website || null
+          };
         }
       }
     } catch (err) {

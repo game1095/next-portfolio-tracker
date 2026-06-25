@@ -1,5 +1,6 @@
 import express from 'express';
 import YahooFinance from 'yahoo-finance2';
+import cache from '../utils/cache.js';
 const yahooFinance = new YahooFinance();
 
 const router = express.Router();
@@ -17,8 +18,13 @@ router.post('/sectors', async (req, res) => {
     // Yahoo Finance API provides sector information via the quoteSummary module ('assetProfile')
     for (const symbol of symbols) {
       try {
-        const result = await yahooFinance.quoteSummary(symbol, { modules: ['assetProfile'] });
-        const sector = result.assetProfile?.sector || 'Unknown';
+        const cacheKey = `summary_${symbol}`;
+        let qs = cache.get(cacheKey);
+        if (!qs) {
+          qs = await yahooFinance.quoteSummary(symbol, { modules: ['assetProfile'] });
+          cache.set(cacheKey, qs, 3600); // Cache sector for 1 hour
+        }
+        const sector = qs.assetProfile?.sector || 'Unknown';
         sectorData[symbol] = sector;
       } catch (err) {
         console.error(`Failed to fetch sector for ${symbol}`, err);
@@ -62,7 +68,13 @@ router.post('/news', async (req, res) => {
     // Fetch news concurrently for all symbols
     const promises = symbols.map(async (symbol) => {
       try {
-        const result = await yahooFinance.search(symbol, { newsCount: 5 });
+        const cacheKey = `news_${symbol}`;
+        let result = cache.get(cacheKey);
+        if (!result) {
+          result = await yahooFinance.search(symbol, { newsCount: 5 });
+          cache.set(cacheKey, result, 900); // Cache news for 15 minutes
+        }
+        
         if (result.news && Array.isArray(result.news)) {
           result.news.forEach(item => {
             // Deduplicate by uuid
