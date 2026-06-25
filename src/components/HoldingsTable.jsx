@@ -1,9 +1,88 @@
-import { useState } from 'react';
-import { LayoutDashboard, ArrowUpDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { LayoutDashboard, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import InfoTooltip from './InfoTooltip';
+
+const HoldingRow = ({ h, currencySymbol, exRate }) => {
+  const [flashClass, setFlashClass] = useState('');
+  const prevPrice = useRef(h.currentPrice);
+
+  useEffect(() => {
+    if (h.currentPrice !== prevPrice.current) {
+      if (h.currentPrice > prevPrice.current) {
+        setFlashClass('flash-up');
+      } else if (h.currentPrice < prevPrice.current) {
+        setFlashClass('flash-down');
+      }
+      prevPrice.current = h.currentPrice;
+
+      const timer = setTimeout(() => {
+        setFlashClass('');
+      }, 3500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [h.currentPrice]);
+
+  return (
+    <tr className={`border-b border-surface-elevated/50 transition-colors ${flashClass || 'hover:bg-surface-elevated/20'}`}>
+      <td className="px-4 py-3 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-elevated flex items-center justify-center shrink-0 border border-surface-elevated relative">
+          <span className="text-xs font-bold text-text-muted absolute z-0">
+            {h.symbol.charAt(0)}
+          </span>
+          {h.website && (
+            <img 
+              src={`https://www.google.com/s2/favicons?domain=${h.website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]}&sz=128`} 
+              alt={h.symbol}
+              className="w-full h-full object-cover z-10 bg-white"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          )}
+        </div>
+        <div>
+          <div className="font-bold text-sm">{h.symbol}</div>
+          <div className="text-[11px] text-text-muted font-normal">{h.sector}</div>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-right font-tabular text-sm">{h.totalShares.toLocaleString()}</td>
+      <td className="px-4 py-3 text-right font-tabular text-sm text-text-muted">{currencySymbol}{(h.averageCost * exRate)?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+      <td className="px-4 py-3 text-right font-tabular text-sm">{currencySymbol}{(h.currentPrice * exRate)?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+      <td className="px-4 py-3 text-right font-tabular text-sm font-bold">{currencySymbol}{(h.totalValue * exRate)?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+      <td className={`px-4 py-3 text-right font-tabular text-sm ${h.unrealizedPl >= 0 ? 'text-trading-up' : 'text-trading-down'}`}>
+        <div className="font-bold">{h.unrealizedPl >= 0 ? '+' : ''}{currencySymbol}{(Math.abs(h.unrealizedPl) * exRate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+        <div className="text-[11px] opacity-80">{h.unrealizedPl >= 0 ? '+' : ''}{h.unrealizedPlPercent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</div>
+      </td>
+      <td className="px-4 py-3 text-right font-tabular text-sm text-primary font-bold">
+        {h.yieldOnCost > 0 ? `${h.yieldOnCost.toFixed(2)}%` : '-'}
+      </td>
+    </tr>
+  );
+};
 
 export default function HoldingsTable({ data, loading, currency }) {
   const [sortConfig, setSortConfig] = useState({ key: 'totalValue', direction: 'desc' });
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [progress, setProgress] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setLastUpdate(Date.now());
+    setProgress(0);
+  }, [data]);
+
+  useEffect(() => {
+    const updateInterval = 60000; // 60 seconds
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - lastUpdate;
+      const p = Math.min((elapsed / updateInterval) * 100, 100);
+      setProgress(p);
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [lastUpdate]);
 
   if (!data?.holdings) return null;
 
@@ -28,6 +107,7 @@ export default function HoldingsTable({ data, loading, currency }) {
       direction = 'asc';
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1); // Reset page on sort
   };
 
   const SortIcon = ({ columnKey }) => {
@@ -43,6 +123,12 @@ export default function HoldingsTable({ data, loading, currency }) {
   const exRate = currency === 'THB' ? (data?.summary?.liveUsdThb || 1) : 1;
   const currencySymbol = currency === 'USD' ? '$' : '฿';
 
+  const totalPages = Math.ceil((sortedHoldings?.length || 0) / ITEMS_PER_PAGE);
+  const currentHoldings = sortedHoldings.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <section className="bg-surface-card rounded-xl border border-surface-elevated">
       <div className="px-4 py-3 border-b border-surface-elevated flex items-center justify-between">
@@ -51,7 +137,18 @@ export default function HoldingsTable({ data, loading, currency }) {
             <LayoutDashboard size={16} className="text-primary"/>
             Your Assets
           </h2>
-          <InfoTooltip text="ตารางสรุปรายละเอียดสินทรัพย์ทั้งหมดที่มีอยู่ในพอร์ตของคุณแบบเจาะลึก" />
+          <InfoTooltip text="ตารางสรุปรายละเอียดสินทรัพย์ทั้งหมดที่มีอยู่ในพอร์ตของคุณแบบเจาะลึก (ระบบจะดึงข้อมูลใหม่ทุกๆ 60 วินาที)" />
+        </div>
+        
+        {/* Cooldown Bar */}
+        <div className="flex items-center gap-2" title="Next auto-update">
+          <span className="text-[10px] text-text-muted font-medium uppercase tracking-wider hidden sm:inline-block">Update in</span>
+          <div className="w-16 sm:w-24 h-1.5 bg-canvas-dark border border-surface-elevated rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary transition-all duration-100 ease-linear" 
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -100,43 +197,20 @@ export default function HoldingsTable({ data, loading, currency }) {
               <tr>
                 <td colSpan="7" className="p-8 text-center text-text-muted text-sm animate-pulse">Loading holdings...</td>
               </tr>
-            ) : sortedHoldings.length > 0 ? (
-              sortedHoldings.map((h, i) => (
-                <tr key={i} className="border-b border-surface-elevated/50 hover:bg-surface-elevated/20 transition-colors">
-                  <td className="px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-elevated flex items-center justify-center shrink-0 border border-surface-elevated relative">
-                      <span className="text-xs font-bold text-text-muted absolute z-0">
-                        {h.symbol.charAt(0)}
-                      </span>
-                      {h.website && (
-                        <img 
-                          src={`https://www.google.com/s2/favicons?domain=${h.website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]}&sz=128`} 
-                          alt={h.symbol}
-                          className="w-full h-full object-cover z-10 bg-white"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm">{h.symbol}</div>
-                      <div className="text-[11px] text-text-muted font-normal">{h.sector}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-tabular text-sm">{h.totalShares.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-tabular text-sm text-text-muted">{currencySymbol}{(h.averageCost * exRate)?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td className="px-4 py-3 text-right font-tabular text-sm">{currencySymbol}{(h.currentPrice * exRate)?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td className="px-4 py-3 text-right font-tabular text-sm font-bold">{currencySymbol}{(h.totalValue * exRate)?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  <td className={`px-4 py-3 text-right font-tabular text-sm ${h.unrealizedPl >= 0 ? 'text-trading-up' : 'text-trading-down'}`}>
-                    <div className="font-bold">{h.unrealizedPl >= 0 ? '+' : ''}{currencySymbol}{(Math.abs(h.unrealizedPl) * exRate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                    <div className="text-[11px] opacity-80">{h.unrealizedPl >= 0 ? '+' : ''}{h.unrealizedPlPercent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-tabular text-sm text-primary font-bold">
-                    {h.yieldOnCost > 0 ? `${h.yieldOnCost.toFixed(2)}%` : '-'}
-                  </td>
-                </tr>
-              ))
+            ) : currentHoldings.length > 0 ? (
+              <>
+                {currentHoldings.map((h) => (
+                  <HoldingRow key={h.symbol} h={h} currencySymbol={currencySymbol} exRate={exRate} />
+                ))}
+                {Array.from({ length: ITEMS_PER_PAGE - currentHoldings.length }).map((_, idx) => (
+                  <tr key={`empty-${idx}`} className="border-b border-surface-elevated/50">
+                    <td className="px-4 py-3 flex items-center gap-3 invisible">
+                      <div className="w-8 h-8"></div>
+                    </td>
+                    <td colSpan="6"></td>
+                  </tr>
+                ))}
+              </>
             ) : (
               <tr>
                 <td colSpan="7" className="p-8 text-center text-text-muted text-sm">
@@ -147,6 +221,49 @@ export default function HoldingsTable({ data, loading, currency }) {
           </tbody>
         </table>
       </div>
+      
+      {totalPages > 1 && !loading && (
+        <div className="px-4 py-3 border-t border-surface-elevated flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
+          <div className="text-text-muted font-sans text-xs">
+            Showing <span className="font-tabular font-bold text-text-body">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-tabular font-bold text-text-body">{Math.min(currentPage * ITEMS_PER_PAGE, sortedHoldings.length)}</span> of <span className="font-tabular font-bold text-text-body">{sortedHoldings.length}</span> assets
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-md border border-surface-elevated text-text-muted hover:text-text-body hover:bg-surface-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            
+            {Array.from({ length: totalPages }).map((_, idx) => {
+              const page = idx + 1;
+              const isActive = page === currentPage;
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-7 h-7 flex items-center justify-center rounded-md font-tabular text-xs transition-colors ${
+                    isActive 
+                      ? 'bg-primary text-[#181a20] font-bold' 
+                      : 'border border-surface-elevated text-text-muted hover:text-text-body hover:bg-surface-elevated'
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-md border border-surface-elevated text-text-muted hover:text-text-body hover:bg-surface-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

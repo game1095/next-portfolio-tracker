@@ -84,3 +84,22 @@ body {
   animation: run 0.3s infinite;
   display: inline-block;
 }
+
+/* Flash Animations for Price Updates */
+@keyframes flash-up {
+  0% { background-color: rgba(14, 203, 129, 0.4); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-down {
+  0% { background-color: rgba(246, 70, 93, 0.4); }
+  100% { background-color: transparent; }
+}
+
+.flash-up {
+  animation: flash-up 3.5s ease-out forwards;
+}
+
+.flash-down {
+  animation: flash-down 3.5s ease-out forwards;
+}
