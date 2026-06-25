@@ -16,7 +16,7 @@ router.post('/sectors', async (req, res) => {
     const sectorData = {};
     
     // Yahoo Finance API provides sector information via the quoteSummary module ('assetProfile')
-    for (const symbol of symbols) {
+    await Promise.all(symbols.map(async (symbol) => {
       try {
         const cacheKey = `summary_${symbol}`;
         let qs = cache.get(cacheKey);
@@ -30,7 +30,7 @@ router.post('/sectors', async (req, res) => {
         console.error(`Failed to fetch sector for ${symbol}`, err);
         sectorData[symbol] = 'Unknown';
       }
-    }
+    }));
 
     res.json({ sectorData });
   } catch (error) {

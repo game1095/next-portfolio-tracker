@@ -146,8 +146,8 @@ router.get('/', async (req, res) => {
           };
         });
 
-        // Fetch quoteSummary for sectors
-        for (const sym of symbols) {
+        // Fetch quoteSummary for sectors concurrently
+        await Promise.all(symbols.map(async (sym) => {
           const summaryKey = `summary_${sym}`;
           let qs = cache.get(summaryKey);
           
@@ -164,7 +164,7 @@ router.get('/', async (req, res) => {
             sector: qs.assetProfile?.sector || 'Unknown',
             website: qs.assetProfile?.website || null
           };
-        }
+        }));
       }
     } catch (err) {
       console.error('Failed to fetch market data:', err.message);

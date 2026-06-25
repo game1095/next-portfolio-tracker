@@ -21,25 +21,65 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 import Portfolio from './models/Portfolio.js';
 
-if (!MONGODB_URI) {
-  console.warn("MONGODB_URI is not defined in .env file. Running without DB connection.");
-} else {
-  mongoose.connect(MONGODB_URI)
-    .then(async () => {
-      console.log('Connected to MongoDB');
-      // Ensure at least one default portfolio exists
-      const count = await Portfolio.countDocuments();
-      if (count === 0) {
-        await Portfolio.create({
-          name: 'My Default Portfolio',
-          description: 'Auto-created base portfolio',
-          targetStrategy: 'Long-term Growth'
-        });
-        console.log('Created default portfolio');
-      }
-    })
-    .catch((err) => console.error('MongoDB connection error:', err));
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
 }
+
+const connectDB = async () => {
+  if (cached.conn) return cached.conn;
+  
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
+    
+    cached.promise = mongoose.connect(MONGODB_URI, opts)
+      .then(async (mongoose) => {
+        console.log('Connected to MongoDB');
+        // Ensure at least one default portfolio exists
+        const count = await Portfolio.countDocuments();
+        if (count === 0) {
+          await Portfolio.create({
+            name: 'My Default Portfolio',
+            description: 'Auto-created base portfolio',
+            targetStrategy: 'Long-term Growth'
+          });
+          console.log('Created default portfolio');
+        }
+        return mongoose;
+      })
+      .catch((err) => {
+        console.error('MongoDB connection error:', err);
+        cached.promise = null;
+        throw err;
+      });
+  }
+  
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
+  
+  return cached.conn;
+};
+
+// Ensure DB is connected before handling any requests
+app.use(async (req, res, next) => {
+  if (MONGODB_URI) {
+    try {
+      await connectDB();
+    } catch (err) {
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+  } else {
+    console.warn("MONGODB_URI is not defined in .env file. Running without DB connection.");
+  }
+  next();
+});
 
 // Routes
 app.use('/api/transactions', transactionRoutes);
