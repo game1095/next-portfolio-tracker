@@ -16,9 +16,10 @@ export default function PortfolioSelector({ portfolios, activeId, onChange }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const safePortfolios = Array.isArray(portfolios) ? portfolios : [];
   const activePortfolio = activeId === 'global' 
     ? { name: 'Global Portfolio', _id: 'global' } 
-    : portfolios.find(p => p._id === activeId);
+    : safePortfolios.find(p => p._id === activeId);
 
   return (
     <div className="relative" ref={dropdownRef}>
