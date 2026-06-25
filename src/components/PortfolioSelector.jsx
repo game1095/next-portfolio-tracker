@@ -47,7 +47,7 @@ export default function PortfolioSelector({ portfolios, activeId, onChange }) {
               Global Portfolio
             </button>
             
-            {portfolios.length > 0 && (
+            {safePortfolios.length > 0 && (
               <>
                 <div className="h-px bg-surface-elevated my-2 mx-2"></div>
                 <div className="text-xs font-bold text-text-muted uppercase px-3 pb-1.5 pt-1 tracking-wider">Sub-Portfolios</div>
@@ -55,7 +55,7 @@ export default function PortfolioSelector({ portfolios, activeId, onChange }) {
             )}
 
             <div className="max-h-60 overflow-y-auto pr-1">
-              {portfolios.map(p => (
+              {safePortfolios.map(p => (
                 <button
                   key={p._id}
                   onClick={() => { onChange(p._id); setIsOpen(false); }}
